@@ -212,6 +212,17 @@ public class Trie {
         return null;
     }
 
+    public synchronized boolean isValidWord(String word) {
+        if (word == null || word.isEmpty()) return false;
+        TrieNode current = root;
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            current = current.getChild(c);
+            if (current == null) return false;
+        }
+        return current.isWord;
+    }
+
     public synchronized List<String> getPredictions(String prefix, String previousWord, int maxResults) {
         return getPredictions(prefix, null, previousWord, maxResults);
     }
@@ -321,7 +332,7 @@ public class Trie {
         }
 
         // 4. Indonesian Morphological Fallback Extensions (affixes)
-        if (results.size() < maxResults && cleanPrefix.length() >= 2) {
+        if (results.size() < maxResults && cleanPrefix.length() >= 2 && isValidWord(cleanPrefix)) {
             String[] suffixes = {"nya", "kan", "an", "i", "ku", "mu", "lah", "kah"};
             for (String suf : suffixes) {
                 String candidate = cleanPrefix + suf;

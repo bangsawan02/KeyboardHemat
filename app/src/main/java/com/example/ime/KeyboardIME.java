@@ -126,6 +126,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
             }
         }
         updatePredictions();
+        checkAutoCaps();
     }
 
     private void loadSettings() {
@@ -234,6 +235,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
             ic.commitText(String.valueOf(c), 1);
             updatePredictions();
         }
+        checkAutoCaps();
     }
 
     @Override
@@ -342,6 +344,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
                 ic.setSelection(0, 0);
             }
         }
+        checkAutoCaps();
     }
 
     @Override
@@ -358,6 +361,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
         pushWordContext(word);
         composingWord.setLength(0);
         updatePredictions();
+        checkAutoCaps();
     }
 
     @Override
@@ -385,10 +389,28 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
         if (ic == null || emoji == null) return;
         if (composingWord.length() > 0) {
             String word = composingWord.toString();
-            predictionEngine.learnWordAsync(word, false, dbHelper);
+            predictionEngine.learnStyleAsync(secondLastWordContext, lastWordContext, word, dbHelper);
             composingWord.setLength(0);
         }
         ic.commitText(emoji, 1);
         updatePredictions();
+        checkAutoCaps();
+    }
+
+    private void checkAutoCaps() {
+        if (keyboardView == null) return;
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+
+        CharSequence textBefore = ic.getTextBeforeCursor(4, 0);
+        if (textBefore == null || textBefore.length() == 0) {
+            keyboardView.setShifted(true);
+            return;
+        }
+
+        String str = textBefore.toString();
+        if (str.matches(".*[.!?]\\s*") || str.endsWith("\n") || str.endsWith("\r")) {
+            keyboardView.setShifted(true);
+        }
     }
 }

@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 /**
  * Background Text Prediction Engine for Indonesian Vocabulary.
@@ -18,6 +19,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * to guarantee ultra-low memory usage, zero UI lag, and smooth 60fps typing.
  */
 public class PredictionEngine {
+
+    private static final Pattern SANITIZE_PATTERN = Pattern.compile("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]");
 
     public interface PredictionCallback {
         void onPredictionsReady(String query, List<String> predictions);
@@ -72,6 +75,18 @@ public class PredictionEngine {
                         List<DatabaseHelper.WordItem> words = dbHelper.searchWords(null, null);
                         for (DatabaseHelper.WordItem item : words) {
                             trie.insert(item.word, item.frequency);
+                        }
+
+                        // Load User Bigrams
+                        List<DatabaseHelper.BigramItem> bigrams = dbHelper.getAllUserBigrams();
+                        for (DatabaseHelper.BigramItem item : bigrams) {
+                            trie.learnBigram(item.prevWord, item.nextWord);
+                        }
+
+                        // Load User Trigrams
+                        List<DatabaseHelper.TrigramItem> trigrams = dbHelper.getAllUserTrigrams();
+                        for (DatabaseHelper.TrigramItem item : trigrams) {
+                            trie.learnTrigram(item.prevWord1, item.prevWord2, item.nextWord);
                         }
 
                         // Load AutoText mapping
@@ -201,7 +216,7 @@ public class PredictionEngine {
                 if (raw.contains(" ")) {
                     String[] parts = raw.split("\\s+");
                     for (String p : parts) {
-                        String clean = p.replaceAll("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "").toLowerCase();
+                        String clean = SANITIZE_PATTERN.matcher(p).replaceAll("").toLowerCase();
                         if (clean.length() >= 2) {
                             trie.insert(clean, isCustom ? 50 : 1);
                             if (dbHelper != null) {
@@ -212,7 +227,7 @@ public class PredictionEngine {
                         }
                     }
                 } else {
-                    String clean = raw.replaceAll("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "").toLowerCase();
+                    String clean = SANITIZE_PATTERN.matcher(raw).replaceAll("").toLowerCase();
                     if (clean.length() >= 2) {
                         trie.insert(clean, isCustom ? 50 : 1);
                         if (dbHelper != null) {
@@ -229,13 +244,13 @@ public class PredictionEngine {
     /**
      * Learns user typing style (bigrams and trigrams context) and word frequency in the background.
      */
-    public void learnStyleAsync(final String prevWord2, final String prevWord1, final String currentWord, final DatabaseHelper dbHelper) {
+    public void learnStyleAsync(final String wordTwoStepsAgo, final String wordOneStepAgo, final String currentWord, final DatabaseHelper dbHelper) {
         if (currentWord == null || currentWord.trim().isEmpty()) return;
-        final String cleanWord = currentWord.trim().toLowerCase().replaceAll("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "");
+        final String cleanWord = SANITIZE_PATTERN.matcher(currentWord.trim().toLowerCase()).replaceAll("");
         if (cleanWord.length() < 1) return;
         
-        final String p1 = prevWord1 != null ? prevWord1.trim().toLowerCase() : null;
-        final String p2 = prevWord2 != null ? prevWord2.trim().toLowerCase() : null;
+        final String w1 = wordOneStepAgo != null ? wordOneStepAgo.trim().toLowerCase() : null;
+        final String w2 = wordTwoStepsAgo != null ? wordTwoStepsAgo.trim().toLowerCase() : null;
 
         backgroundExecutor.execute(new Runnable() {
             @Override
@@ -253,13 +268,23 @@ public class PredictionEngine {
                 }
 
                 // 2. Learn typing style context (Bigram / Trigram)
-                if (p1 != null && !p1.isEmpty() && p2 != null && !p2.isEmpty()) {
-                    trie.learnTrigram(p1, p2, cleanWord);
+                // If we have "WordTwoStepsAgo" (w2) and "WordOneStepAgo" (w1), learn Trigram "w2 w1" -> currentWord
+                if (w2 != null && !w2.isEmpty() && w1 != null && !w1.isEmpty()) {
+                    trie.learnTrigram(w2, w1, cleanWord);
+                    if (dbHelper != null) {
+                        try {
+                            dbHelper.addOrIncrementTrigram(w2, w1, cleanWord);
+                        } catch (Exception ignored) {}
+                    }
                 }
-                if (p2 != null && !p2.isEmpty()) {
-                    trie.learnBigram(p2, cleanWord);
-                } else if (p1 != null && !p1.isEmpty()) {
-                    trie.learnBigram(p1, cleanWord);
+                // Learn Bigram "WordOneStepAgo" (w1) -> currentWord
+                if (w1 != null && !w1.isEmpty()) {
+                    trie.learnBigram(w1, cleanWord);
+                    if (dbHelper != null) {
+                        try {
+                            dbHelper.addOrIncrementBigram(w1, cleanWord);
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
         });

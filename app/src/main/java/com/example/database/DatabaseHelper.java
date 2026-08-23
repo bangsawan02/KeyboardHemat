@@ -66,9 +66,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_SETTING_KEY + " TEXT PRIMARY KEY, " +
                 COLUMN_SETTING_VAL + " TEXT);";
 
+        String createBigramsTable = "CREATE TABLE IF NOT EXISTS user_bigrams (" +
+                "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "prev_word TEXT NOT NULL, " +
+                "next_word TEXT NOT NULL, " +
+                "UNIQUE(prev_word, next_word) ON CONFLICT REPLACE);";
+
+        String createTrigramsTable = "CREATE TABLE IF NOT EXISTS user_trigrams (" +
+                "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "prev_word1 TEXT NOT NULL, " +
+                "prev_word2 TEXT NOT NULL, " +
+                "next_word TEXT NOT NULL, " +
+                "UNIQUE(prev_word1, prev_word2, next_word) ON CONFLICT REPLACE);";
+
         db.execSQL(createWordsTable);
         db.execSQL(createAutoTextTable);
         db.execSQL(createSettingsTable);
+        db.execSQL(createBigramsTable);
+        db.execSQL(createTrigramsTable);
     }
 
     @Override
@@ -512,5 +527,86 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         cv.put(COLUMN_SETTING_KEY, key);
         cv.put(COLUMN_SETTING_VAL, value);
         db.insertWithOnConflict(TABLE_SETTINGS, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized void addOrIncrementBigram(String prevWord, String nextWord) {
+        if (prevWord == null || nextWord == null) return;
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("prev_word", prevWord.trim().toLowerCase());
+            cv.put("next_word", nextWord.trim().toLowerCase());
+            db.insertWithOnConflict("user_bigrams", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public synchronized void addOrIncrementTrigram(String prevWord1, String prevWord2, String nextWord) {
+        if (prevWord1 == null || prevWord2 == null || nextWord == null) return;
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("prev_word1", prevWord1.trim().toLowerCase());
+            cv.put("prev_word2", prevWord2.trim().toLowerCase());
+            cv.put("next_word", nextWord.trim().toLowerCase());
+            db.insertWithOnConflict("user_trigrams", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static class BigramItem {
+        public String prevWord;
+        public String nextWord;
+        public BigramItem(String prevWord, String nextWord) {
+            this.prevWord = prevWord;
+            this.nextWord = nextWord;
+        }
+    }
+
+    public static class TrigramItem {
+        public String prevWord1;
+        public String prevWord2;
+        public String nextWord;
+        public TrigramItem(String prevWord1, String prevWord2, String nextWord) {
+            this.prevWord1 = prevWord1;
+            this.prevWord2 = prevWord2;
+            this.nextWord = nextWord;
+        }
+    }
+
+    public synchronized List<BigramItem> getAllUserBigrams() {
+        List<BigramItem> list = new ArrayList<>();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            Cursor cursor = db.query("user_bigrams", new String[]{"prev_word", "next_word"}, null, null, null, null, "_id ASC");
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    list.add(new BigramItem(cursor.getString(0), cursor.getString(1)));
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public synchronized List<TrigramItem> getAllUserTrigrams() {
+        List<TrigramItem> list = new ArrayList<>();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            Cursor cursor = db.query("user_trigrams", new String[]{"prev_word1", "prev_word2", "next_word"}, null, null, null, null, "_id ASC");
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    list.add(new TrigramItem(cursor.getString(0), cursor.getString(1), cursor.getString(2)));
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }

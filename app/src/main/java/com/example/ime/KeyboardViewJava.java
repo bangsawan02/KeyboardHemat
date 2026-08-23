@@ -177,6 +177,17 @@ public class KeyboardViewJava extends LinearLayout {
         this.listener = listener;
     }
 
+    public void setShifted(boolean shifted) {
+        if (this.isShifted != shifted) {
+            this.isShifted = shifted;
+            renderKeyboard();
+        }
+    }
+
+    public boolean isShifted() {
+        return isShifted;
+    }
+
     private android.graphics.drawable.Drawable.ConstantState normalKeyBgCache;
     private android.graphics.drawable.Drawable.ConstantState specialKeyBgCache;
     private android.graphics.drawable.Drawable.ConstantState actionKeyBgCache;
@@ -629,10 +640,15 @@ public class KeyboardViewJava extends LinearLayout {
         row.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         for (final String k : keys) {
-            row.addView(createNormalKey(k, 1.0f, colors, heightPx, new OnClickListener() {
+            final String letter = isShifted ? k.toUpperCase() : k;
+            row.addView(createNormalKey(letter, 1.0f, colors, heightPx, new OnClickListener() {
                 @Override public void onClick(View v) {
-                    showKeyPopup(v, k);
-                    if (listener != null) listener.onKeyPress(k.charAt(0));
+                    showKeyPopup(v, letter);
+                    if (listener != null) listener.onKeyPress(letter.charAt(0));
+                    if (isShifted) {
+                        isShifted = false;
+                        renderGrid();
+                    }
                 }
             }));
         }
