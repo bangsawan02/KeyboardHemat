@@ -124,6 +124,40 @@ public class Trie {
         autoTextMap.clear();
     }
 
+    public synchronized void learnBigram(String prevWord, String nextWord) {
+        if (prevWord == null || nextWord == null) return;
+        String key = prevWord.trim().toLowerCase();
+        String next = nextWord.trim().toLowerCase();
+        String[] existing = bigramContextMap.get(key);
+        if (existing == null) {
+            bigramContextMap.put(key, new String[]{next});
+        } else {
+            List<String> list = new ArrayList<>();
+            list.add(next);
+            for (String w : existing) {
+                if (!w.equals(next) && list.size() < 6) list.add(w);
+            }
+            bigramContextMap.put(key, list.toArray(new String[0]));
+        }
+    }
+
+    public synchronized void learnTrigram(String prevWord1, String prevWord2, String nextWord) {
+        if (prevWord1 == null || prevWord2 == null || nextWord == null) return;
+        String key = prevWord1.trim().toLowerCase() + " " + prevWord2.trim().toLowerCase();
+        String next = nextWord.trim().toLowerCase();
+        String[] existing = trigramContextMap.get(key);
+        if (existing == null) {
+            trigramContextMap.put(key, new String[]{next});
+        } else {
+            List<String> list = new ArrayList<>();
+            list.add(next);
+            for (String w : existing) {
+                if (!w.equals(next) && list.size() < 6) list.add(w);
+            }
+            trigramContextMap.put(key, list.toArray(new String[0]));
+        }
+    }
+
     public synchronized void insert(String word, int frequency) {
         if (word == null || word.trim().isEmpty()) return;
         String clean = word.trim().toLowerCase();

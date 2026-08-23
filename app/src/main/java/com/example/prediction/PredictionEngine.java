@@ -227,6 +227,45 @@ public class PredictionEngine {
     }
 
     /**
+     * Learns user typing style (bigrams and trigrams context) and word frequency in the background.
+     */
+    public void learnStyleAsync(final String prevWord2, final String prevWord1, final String currentWord, final DatabaseHelper dbHelper) {
+        if (currentWord == null || currentWord.trim().isEmpty()) return;
+        final String cleanWord = currentWord.trim().toLowerCase().replaceAll("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "");
+        if (cleanWord.length() < 1) return;
+        
+        final String p1 = prevWord1 != null ? prevWord1.trim().toLowerCase() : null;
+        final String p2 = prevWord2 != null ? prevWord2.trim().toLowerCase() : null;
+
+        backgroundExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+                } catch (Throwable ignored) {}
+
+                // 1. Learn word frequency
+                trie.insert(cleanWord, 35);
+                if (dbHelper != null) {
+                    try {
+                        dbHelper.addOrIncrementWord(cleanWord, true);
+                    } catch (Exception ignored) {}
+                }
+
+                // 2. Learn typing style context (Bigram / Trigram)
+                if (p1 != null && !p1.isEmpty() && p2 != null && !p2.isEmpty()) {
+                    trie.learnTrigram(p1, p2, cleanWord);
+                }
+                if (p2 != null && !p2.isEmpty()) {
+                    trie.learnBigram(p2, cleanWord);
+                } else if (p1 != null && !p1.isEmpty()) {
+                    trie.learnBigram(p1, cleanWord);
+                }
+            }
+        });
+    }
+
+    /**
      * Removes a word from in-memory trie in the background.
      */
     public void removeWordAsync(final String word) {
