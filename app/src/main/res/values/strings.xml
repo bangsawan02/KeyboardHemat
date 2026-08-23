@@ -1,3 +1,22 @@
 <resources>
     <string name="app_name">Keyboard Hemat</string>
+    <string name="settings_title">Pengaturan Keyboard Hemat</string>
+    <string name="settings_subtitle">Sesuaikan fitur cerdas pengetikan keyboard sesuai kenyamanan Anda.</string>
+    <string name="section_typing_features">⚙️ Fitur Pengetikan &amp; Prediksi</string>
+    <string name="pred_title">Prediksi Teks (Text Prediction)</string>
+    <string name="pred_desc">Menampilkan bilah saran dan rekomendasi kata cerdas saat mengetik.</string>
+    <string name="autocorrect_title">Koreksi Otomatis (Auto-Correction)</string>
+    <string name="autocorrect_desc">Otomatis mengoreksi singkatan dan memilih saran terbaik saat menekan tombol spasi.</string>
+    <string name="haptic_title">Getaran Sentuhan (Haptic Feedback)</string>
+    <string name="haptic_desc">Memberikan getaran responsif setiap kali tombol keyboard ditekan.</string>
+    <string name="haptic_intensity_title">Intensitas Getaran</string>
+    <string name="haptic_light">Ringan</string>
+    <string name="haptic_medium">Sedang</string>
+    <string name="haptic_strong">Kuat</string>
+    <string name="one_handed_title">Mode Satu Tangan (One-Handed Mode)</string>
+    <string name="one_handed_off">Mati</string>
+    <string name="one_handed_left">Kiri</string>
+    <string name="one_handed_right">Kanan</string>
+    <string name="dark_mode_title">Tema Gelap Otomatis (Ikuti Sistem)</string>
+    <string name="dark_mode_desc">Menyesuaikan tampilan pengaturan otomatis mengikuti tema perangkat.</string>
 </resources>

@@ -183,6 +183,29 @@ public class SettingsActivity extends Activity {
                 }
         ));
 
+        settingsCard.addView(createDivider());
+
+        // Toggle 4: Dark Mode Auto Sync (Ikuti Sistem)
+        boolean isDarkModeSyncOn = "1".equals(dbHelper.getSetting("dark_mode_sync", "1"));
+        createSettingItem(
+                settingsCard,
+                getString(R.string.dark_mode_title),
+                getString(R.string.dark_mode_desc),
+                isDarkModeSyncOn,
+                new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                        dbHelper.setSetting("dark_mode_sync", isChecked ? "1" : "0");
+                        if (isChecked) {
+                            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+                        } else {
+                            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
+                        }
+                        showFeedbackToast("Tema Gelap Otomatis " + (isChecked ? "Diaktifkan" : "Dinonaktifkan"));
+                    }
+                }
+        );
+
         rootLayout.addView(settingsCard);
 
         // 3. Live Test Area Card

@@ -80,8 +80,18 @@ public class Trie {
     }
 
     private final TrieNode root = new TrieNode();
-    private final Map<String, String[]> bigramContextMap = new HashMap<>();
-    private final Map<String, String[]> trigramContextMap = new HashMap<>();
+    private final Map<String, String[]> bigramContextMap = new java.util.LinkedHashMap<String, String[]>(128, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, String[]> eldest) {
+            return size() > 2048;
+        }
+    };
+    private final Map<String, String[]> trigramContextMap = new java.util.LinkedHashMap<String, String[]>(128, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, String[]> eldest) {
+            return size() > 2048;
+        }
+    };
     private final Map<String, String> abbreviationMap = new HashMap<>();
     private final Map<String, List<String>> autoTextMap = new HashMap<>();
 
