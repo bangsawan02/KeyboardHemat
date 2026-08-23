@@ -147,6 +147,42 @@ public class SettingsActivity extends Activity {
                 }
         );
 
+        settingsCard.addView(createDivider());
+
+        // Haptic Intensity Selector
+        String currentHapticIntensity = dbHelper.getSetting("haptic_intensity", "MEDIUM");
+        settingsCard.addView(createRadioSelector(
+                "Intensitas Getaran",
+                new String[]{"Ringan", "Sedang", "Kuat"},
+                new String[]{"LIGHT", "MEDIUM", "STRONG"},
+                currentHapticIntensity,
+                new OnSelectListener() {
+                    @Override
+                    public void onSelected(String val) {
+                        dbHelper.setSetting("haptic_intensity", val);
+                        showFeedbackToast("Intensitas getaran diperbarui");
+                    }
+                }
+        ));
+
+        settingsCard.addView(createDivider());
+
+        // One-Handed Mode Selector
+        String currentOneHanded = dbHelper.getSetting("one_handed", "OFF");
+        settingsCard.addView(createRadioSelector(
+                "Mode Satu Tangan (One-Handed Mode)",
+                new String[]{"Mati", "Kiri", "Kanan"},
+                new String[]{"OFF", "LEFT", "RIGHT"},
+                currentOneHanded,
+                new OnSelectListener() {
+                    @Override
+                    public void onSelected(String val) {
+                        dbHelper.setSetting("one_handed", val);
+                        showFeedbackToast("Mode satu tangan diperbarui");
+                    }
+                }
+        ));
+
         rootLayout.addView(settingsCard);
 
         // 3. Live Test Area Card
@@ -260,6 +296,60 @@ public class SettingsActivity extends Activity {
         lp.setMargins(0, 0, 0, dpToPx(16));
         layout.setLayoutParams(lp);
 
+        return layout;
+    }
+
+    private interface OnSelectListener {
+        void onSelected(String value);
+    }
+
+    private LinearLayout createRadioSelector(String title, final String[] labels, final String[] values, String currentVal, final OnSelectListener listener) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(0, dpToPx(8), 0, dpToPx(8));
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText(title);
+        titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        titleTv.setTypeface(Typeface.DEFAULT_BOLD);
+        titleTv.setTextColor(Color.parseColor("#212121"));
+        layout.addView(titleTv);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dpToPx(6), 0, 0);
+
+        final android.widget.RadioButton[] rbs = new android.widget.RadioButton[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            final String val = values[i];
+            final android.widget.RadioButton rb = new android.widget.RadioButton(this);
+            rb.setText(labels[i]);
+            rb.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            rb.setTextColor(Color.parseColor("#424242"));
+            rb.setChecked(val.equals(currentVal));
+            rbs[i] = rb;
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            rb.setLayoutParams(lp);
+
+            final int index = i;
+            rb.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    for (int j = 0; j < rbs.length; j++) {
+                        rbs[j].setChecked(j == index);
+                    }
+                    if (listener != null) {
+                        listener.onSelected(val);
+                    }
+                }
+            });
+
+            row.addView(rb);
+        }
+
+        layout.addView(row);
         return layout;
     }
 

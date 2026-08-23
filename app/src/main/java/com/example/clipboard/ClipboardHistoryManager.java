@@ -68,6 +68,7 @@ public class ClipboardHistoryManager {
 
     public synchronized void addClip(String text) {
         if (text == null || text.trim().isEmpty()) return;
+        if (isSensitiveData(text)) return; // Exclude sensitive data (passwords, tokens, cards)
         String trimmed = text.trim();
 
         // Remove duplicate if exists
@@ -86,6 +87,24 @@ public class ClipboardHistoryManager {
         if (updateListener != null) {
             updateListener.OnClipboardUpdated(new ArrayList<>(clipHistory));
         }
+    }
+
+    private boolean isSensitiveData(String text) {
+        if (text == null) return false;
+        String lower = text.toLowerCase();
+        if (lower.contains("password") || lower.contains("passwd") || lower.contains("sandi") ||
+            lower.contains("token") || lower.contains("bearer") || lower.contains("secret") ||
+            lower.contains("api_key") || lower.contains("apikey") || lower.contains("auth") ||
+            lower.contains("cvv") || lower.contains("otp") || lower.contains("pin ")) {
+            return true;
+        }
+        if (text.matches(".*\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b.*")) {
+            return true;
+        }
+        if (text.length() > 32 && !text.contains(" ") && text.matches("^[A-Za-z0-9_\\-\\./=]+$")) {
+            return true;
+        }
+        return false;
     }
 
     public synchronized List<String> getClips() {

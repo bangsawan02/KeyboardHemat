@@ -200,6 +200,20 @@ public class KeyboardViewJava extends LinearLayout {
         renderKeyboard();
     }
 
+    private String oneHandedMode = "OFF";
+    public void setOneHandedMode(String mode) {
+        this.oneHandedMode = mode != null ? mode : "OFF";
+        if (keyboardGridContainer != null) {
+            if ("LEFT".equals(oneHandedMode)) {
+                keyboardGridContainer.setPadding(0, 0, dpToPx(70), 0);
+            } else if ("RIGHT".equals(oneHandedMode)) {
+                keyboardGridContainer.setPadding(dpToPx(70), 0, 0, 0);
+            } else {
+                keyboardGridContainer.setPadding(0, 0, 0, 0);
+            }
+        }
+    }
+
     public void setPredictions(List<String> predictions) {
         this.currentPredictions = predictions != null ? predictions : new ArrayList<String>();
         renderSuggestions();

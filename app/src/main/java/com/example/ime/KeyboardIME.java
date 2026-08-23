@@ -55,6 +55,8 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
     private boolean autocorrectEnabled = false; // Auto-correct disabled per requirement
     private boolean predictionEnabled = true;
     private boolean hapticEnabled = true;
+    private String hapticIntensity = "MEDIUM";
+    private String oneHandedMode = "OFF";
 
     @Override
     public void onCreate() {
@@ -157,11 +159,14 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
         autocorrectEnabled = "1".equals(dbHelper.getSetting("autocorrect", "1"));
         predictionEnabled = "1".equals(dbHelper.getSetting("prediction", "1"));
         hapticEnabled = "1".equals(dbHelper.getSetting("haptic", "1"));
+        hapticIntensity = dbHelper.getSetting("haptic_intensity", "MEDIUM");
+        oneHandedMode = dbHelper.getSetting("one_handed", "OFF");
     }
 
     private void applyConfiguration() {
         if (keyboardView != null) {
             keyboardView.setConfiguration(activeTheme, heightStyle, customKeyHeightDp, shapeStyle);
+            keyboardView.setOneHandedMode(oneHandedMode);
         }
     }
 
@@ -187,10 +192,14 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
     private void triggerHaptic() {
         if (hapticEnabled && vibrator != null) {
             try {
+                int duration = 35;
+                if ("LIGHT".equals(hapticIntensity)) duration = 15;
+                else if ("STRONG".equals(hapticIntensity)) duration = 60;
+
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(15, VibrationEffect.DEFAULT_AMPLITUDE));
+                    vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE));
                 } else {
-                    vibrator.vibrate(15);
+                    vibrator.vibrate(duration);
                 }
             } catch (Exception ignored) {}
         }
