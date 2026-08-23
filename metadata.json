@@ -1,0 +1,6 @@
+{
+  "name": "Keyboard Hemat",
+  "description": "Aplikasi keyboard Android ringan, hemat memory, dengan kustomisasi tema sederhana serta koreksi otomatis dan prediksi teks cerdas dalam Bahasa Indonesia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
