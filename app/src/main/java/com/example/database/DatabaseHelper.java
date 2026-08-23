@@ -12,7 +12,7 @@ import java.util.List;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "keyboard_hemat.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     public static final String TABLE_WORDS = "words";
     public static final String COLUMN_ID = "_id";
@@ -43,38 +43,61 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String createWordsTable = "CREATE TABLE " + TABLE_WORDS + " (" +
+        createTables(db);
+        insertInitialWords(db);
+        insertInitialAutoText(db);
+    }
+
+    private void createTables(SQLiteDatabase db) {
+        String createWordsTable = "CREATE TABLE IF NOT EXISTS " + TABLE_WORDS + " (" +
                 COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COLUMN_WORD + " TEXT UNIQUE NOT NULL, " +
                 COLUMN_FREQ + " INTEGER DEFAULT 1, " +
                 COLUMN_IS_CUSTOM + " INTEGER DEFAULT 0);";
 
-        String createAutoTextTable = "CREATE TABLE " + TABLE_AUTOTEXT + " (" +
+        String createAutoTextTable = "CREATE TABLE IF NOT EXISTS " + TABLE_AUTOTEXT + " (" +
                 COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COLUMN_SHORTCUT + " TEXT NOT NULL, " +
                 COLUMN_REPLACEMENT + " TEXT NOT NULL, " +
                 COLUMN_FREQ + " INTEGER DEFAULT 1, " +
                 COLUMN_IS_CUSTOM + " INTEGER DEFAULT 0);";
 
-        String createSettingsTable = "CREATE TABLE " + TABLE_SETTINGS + " (" +
+        String createSettingsTable = "CREATE TABLE IF NOT EXISTS " + TABLE_SETTINGS + " (" +
                 COLUMN_SETTING_KEY + " TEXT PRIMARY KEY, " +
                 COLUMN_SETTING_VAL + " TEXT);";
 
         db.execSQL(createWordsTable);
         db.execSQL(createAutoTextTable);
         db.execSQL(createSettingsTable);
+    }
 
-        // Pre-populate common words and initial AutoText matching user screenshot
-        insertInitialWords(db);
-        insertInitialAutoText(db);
+    @Override
+    public void onOpen(SQLiteDatabase db) {
+        super.onOpen(db);
+        createTables(db);
+        ensureInitialDataIfEmpty(db);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORDS);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_AUTOTEXT);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SETTINGS);
-        onCreate(db);
+        createTables(db);
+        ensureInitialDataIfEmpty(db);
+    }
+
+    private void ensureInitialDataIfEmpty(SQLiteDatabase db) {
+        try {
+            Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_AUTOTEXT, null);
+            boolean empty = true;
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    empty = cursor.getInt(0) == 0;
+                }
+                cursor.close();
+            }
+            if (empty) {
+                insertInitialAutoText(db);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void insertInitialAutoText(SQLiteDatabase db) {
@@ -160,23 +183,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         if (word == null || word.trim().length() < 2) return;
         String cleanWord = word.trim().toLowerCase();
         
-        SQLiteDatabase db = getWritableDatabase();
-        Cursor cursor = db.query(TABLE_WORDS, new String[]{COLUMN_FREQ, COLUMN_IS_CUSTOM},
-                COLUMN_WORD + "=?", new String[]{cleanWord}, null, null, null);
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            createTables(db);
+            Cursor cursor = db.query(TABLE_WORDS, new String[]{COLUMN_FREQ, COLUMN_IS_CUSTOM},
+                    COLUMN_WORD + "=?", new String[]{cleanWord}, null, null, null);
 
-        if (cursor != null && cursor.moveToFirst()) {
-            int freq = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FREQ));
-            cursor.close();
-            ContentValues cv = new ContentValues();
-            cv.put(COLUMN_FREQ, freq + 1);
-            db.update(TABLE_WORDS, cv, COLUMN_WORD + "=?", new String[]{cleanWord});
-        } else {
-            if (cursor != null) cursor.close();
-            ContentValues cv = new ContentValues();
-            cv.put(COLUMN_WORD, cleanWord);
-            cv.put(COLUMN_FREQ, isCustom ? 50 : 1);
-            cv.put(COLUMN_IS_CUSTOM, isCustom ? 1 : 0);
-            db.insertWithOnConflict(TABLE_WORDS, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
+            if (cursor != null && cursor.moveToFirst()) {
+                int freq = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FREQ));
+                cursor.close();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_FREQ, freq + 1);
+                db.update(TABLE_WORDS, cv, COLUMN_WORD + "=?", new String[]{cleanWord});
+            } else {
+                if (cursor != null) cursor.close();
+                ContentValues cv = new ContentValues();
+                cv.put(COLUMN_WORD, cleanWord);
+                cv.put(COLUMN_FREQ, isCustom ? 50 : 1);
+                cv.put(COLUMN_IS_CUSTOM, isCustom ? 1 : 0);
+                db.insertWithOnConflict(TABLE_WORDS, null, cv, SQLiteDatabase.CONFLICT_IGNORE);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -190,16 +218,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
 
         String cleanPrefix = prefix.trim().toLowerCase();
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query(TABLE_WORDS, new String[]{COLUMN_WORD},
-                COLUMN_WORD + " LIKE ?", new String[]{cleanPrefix + "%"},
-                null, null, COLUMN_FREQ + " DESC", String.valueOf(limit));
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
+            Cursor cursor = db.query(TABLE_WORDS, new String[]{COLUMN_WORD},
+                    COLUMN_WORD + " LIKE ?", new String[]{cleanPrefix + "%"},
+                    null, null, COLUMN_FREQ + " DESC", String.valueOf(limit));
 
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                list.add(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_WORD)));
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    list.add(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_WORD)));
+                }
+                cursor.close();
             }
-            cursor.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         if (list.isEmpty()) {
@@ -226,75 +259,105 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public synchronized List<WordItem> searchWords(String query, String filterType) {
         List<WordItem> list = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
 
-        StringBuilder selection = new StringBuilder();
-        List<String> selectionArgs = new ArrayList<>();
+            StringBuilder selection = new StringBuilder();
+            List<String> selectionArgs = new ArrayList<>();
 
-        if (query != null && !query.trim().isEmpty()) {
-            selection.append(COLUMN_WORD).append(" LIKE ?");
-            selectionArgs.add("%" + query.trim().toLowerCase() + "%");
-        }
-
-        if ("custom".equalsIgnoreCase(filterType)) {
-            if (selection.length() > 0) selection.append(" AND ");
-            selection.append(COLUMN_IS_CUSTOM).append("=1");
-        } else if ("frequent".equalsIgnoreCase(filterType)) {
-            if (selection.length() > 0) selection.append(" AND ");
-            selection.append(COLUMN_FREQ).append(">10");
-        }
-
-        String selStr = selection.length() > 0 ? selection.toString() : null;
-        String[] selArgs = selectionArgs.isEmpty() ? null : selectionArgs.toArray(new String[0]);
-
-        Cursor cursor = db.query(TABLE_WORDS, null, selStr, selArgs, null, null, COLUMN_FREQ + " DESC", "100");
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID));
-                String word = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_WORD));
-                int freq = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FREQ));
-                boolean isCustom = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_CUSTOM)) == 1;
-                list.add(new WordItem(id, word, freq, isCustom));
+            if (query != null && !query.trim().isEmpty()) {
+                selection.append(COLUMN_WORD).append(" LIKE ?");
+                selectionArgs.add("%" + query.trim().toLowerCase() + "%");
             }
-            cursor.close();
+
+            if ("custom".equalsIgnoreCase(filterType)) {
+                if (selection.length() > 0) selection.append(" AND ");
+                selection.append(COLUMN_IS_CUSTOM).append("=1");
+            } else if ("frequent".equalsIgnoreCase(filterType)) {
+                if (selection.length() > 0) selection.append(" AND ");
+                selection.append(COLUMN_FREQ).append(">10");
+            }
+
+            String selStr = selection.length() > 0 ? selection.toString() : null;
+            String[] selArgs = selectionArgs.isEmpty() ? null : selectionArgs.toArray(new String[0]);
+
+            Cursor cursor = db.query(TABLE_WORDS, null, selStr, selArgs, null, null, COLUMN_FREQ + " DESC", "100");
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID));
+                    String word = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_WORD));
+                    int freq = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FREQ));
+                    boolean isCustom = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_CUSTOM)) == 1;
+                    list.add(new WordItem(id, word, freq, isCustom));
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return list;
     }
 
     public synchronized void deleteWord(String word) {
         if (word == null) return;
-        SQLiteDatabase db = getWritableDatabase();
-        db.delete(TABLE_WORDS, COLUMN_WORD + "=?", new String[]{word.toLowerCase()});
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            createTables(db);
+            db.delete(TABLE_WORDS, COLUMN_WORD + "=?", new String[]{word.toLowerCase()});
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public synchronized void deleteAllCustomWords() {
-        SQLiteDatabase db = getWritableDatabase();
-        db.delete(TABLE_WORDS, COLUMN_IS_CUSTOM + "=1", null);
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            createTables(db);
+            db.delete(TABLE_WORDS, COLUMN_IS_CUSTOM + "=1", null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public synchronized void resetDefaultWords() {
-        SQLiteDatabase db = getWritableDatabase();
-        insertInitialWords(db);
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            createTables(db);
+            insertInitialWords(db);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public synchronized int getTotalWordCount() {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_WORDS, null);
         int count = 0;
-        if (cursor != null) {
-            if (cursor.moveToFirst()) count = cursor.getInt(0);
-            cursor.close();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
+            Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_WORDS, null);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) count = cursor.getInt(0);
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return count;
     }
 
     public synchronized int getCustomWordCount() {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_WORDS + " WHERE " + COLUMN_IS_CUSTOM + "=1", null);
         int count = 0;
-        if (cursor != null) {
-            if (cursor.moveToFirst()) count = cursor.getInt(0);
-            cursor.close();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
+            Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_WORDS + " WHERE " + COLUMN_IS_CUSTOM + "=1", null);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) count = cursor.getInt(0);
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return count;
     }
@@ -359,28 +422,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public synchronized List<AutoTextItem> getAllAutoText(String query) {
         List<AutoTextItem> list = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
 
-        String selection = null;
-        String[] selectionArgs = null;
+            String selection = null;
+            String[] selectionArgs = null;
 
-        if (query != null && !query.trim().isEmpty()) {
-            selection = COLUMN_SHORTCUT + " LIKE ? OR " + COLUMN_REPLACEMENT + " LIKE ?";
-            String arg = "%" + query.trim() + "%";
-            selectionArgs = new String[]{arg, arg};
-        }
-
-        Cursor cursor = db.query(TABLE_AUTOTEXT, null, selection, selectionArgs, null, null, COLUMN_SHORTCUT + " ASC", "300");
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID));
-                String shortcut = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_SHORTCUT));
-                String replacement = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_REPLACEMENT));
-                int freq = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FREQ));
-                boolean isCustom = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_CUSTOM)) == 1;
-                list.add(new AutoTextItem(id, shortcut, replacement, freq, isCustom));
+            if (query != null && !query.trim().isEmpty()) {
+                selection = COLUMN_SHORTCUT + " LIKE ? OR " + COLUMN_REPLACEMENT + " LIKE ?";
+                String arg = "%" + query.trim() + "%";
+                selectionArgs = new String[]{arg, arg};
             }
-            cursor.close();
+
+            Cursor cursor = db.query(TABLE_AUTOTEXT, null, selection, selectionArgs, null, null, COLUMN_SHORTCUT + " ASC", "300");
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID));
+                    String shortcut = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_SHORTCUT));
+                    String replacement = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_REPLACEMENT));
+                    int freq = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FREQ));
+                    boolean isCustom = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_CUSTOM)) == 1;
+                    list.add(new AutoTextItem(id, shortcut, replacement, freq, isCustom));
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return list;
     }
@@ -388,28 +456,38 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public synchronized List<String> getAutoTextReplacements(String shortcut) {
         List<String> results = new ArrayList<>();
         if (shortcut == null || shortcut.trim().isEmpty()) return results;
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query(TABLE_AUTOTEXT, new String[]{COLUMN_REPLACEMENT},
-                COLUMN_SHORTCUT + "=? COLLATE NOCASE", new String[]{shortcut.trim()}, null, null, COLUMN_FREQ + " DESC");
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                String rep = cursor.getString(0);
-                if (!results.contains(rep)) {
-                    results.add(rep);
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
+            Cursor cursor = db.query(TABLE_AUTOTEXT, new String[]{COLUMN_REPLACEMENT},
+                    COLUMN_SHORTCUT + "=? COLLATE NOCASE", new String[]{shortcut.trim()}, null, null, COLUMN_FREQ + " DESC");
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    String rep = cursor.getString(0);
+                    if (!results.contains(rep)) {
+                        results.add(rep);
+                    }
                 }
+                cursor.close();
             }
-            cursor.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return results;
     }
 
     public synchronized int getAutoTextCount() {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_AUTOTEXT, null);
         int count = 0;
-        if (cursor != null) {
-            if (cursor.moveToFirst()) count = cursor.getInt(0);
-            cursor.close();
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            createTables(db);
+            Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_AUTOTEXT, null);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) count = cursor.getInt(0);
+                cursor.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return count;
     }
