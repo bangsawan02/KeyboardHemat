@@ -81,6 +81,7 @@ public class Trie {
 
     private final TrieNode root = new TrieNode();
     private final Map<String, String[]> bigramContextMap = new HashMap<>();
+    private final Map<String, String[]> trigramContextMap = new HashMap<>();
     private final Map<String, String> abbreviationMap = new HashMap<>();
     private final Map<String, List<String>> autoTextMap = new HashMap<>();
 
@@ -88,6 +89,7 @@ public class Trie {
         loadIndonesianVocabulary();
         loadIndonesianAbbreviations();
         loadIndonesianBigrams();
+        loadIndonesianTrigrams();
     }
 
     public synchronized void addAutoText(String shortcut, String replacement) {
@@ -167,13 +169,31 @@ public class Trie {
     }
 
     public synchronized List<String> getPredictions(String prefix, String previousWord, int maxResults) {
+        return getPredictions(prefix, null, previousWord, maxResults);
+    }
+
+    public synchronized List<String> getPredictions(String prefix, String prevWord1, String prevWord2, int maxResults) {
         List<String> results = new ArrayList<>(maxResults);
         
-        // 1. Handle Empty Prefix (Contextual Next-Word Suggestions based on previous word)
+        // 1. Handle Empty Prefix (Contextual N-Gram Next-Word Suggestions based on Trigram & Bigram)
         if (prefix == null || prefix.trim().isEmpty()) {
-            if (previousWord != null && !previousWord.trim().isEmpty()) {
-                String cleanPrev = previousWord.trim().toLowerCase();
-                String[] nextWords = bigramContextMap.get(cleanPrev);
+            // Check Trigram (prevWord1 + " " + prevWord2 -> nextWord)
+            if (prevWord1 != null && !prevWord1.trim().isEmpty() && prevWord2 != null && !prevWord2.trim().isEmpty()) {
+                String trigramKey = prevWord1.trim().toLowerCase() + " " + prevWord2.trim().toLowerCase();
+                String[] nextWords = trigramContextMap.get(trigramKey);
+                if (nextWords != null) {
+                    for (String nw : nextWords) {
+                        if (!results.contains(nw)) {
+                            results.add(nw);
+                            if (results.size() >= maxResults) return results;
+                        }
+                    }
+                }
+            }
+            // Check Bigram (prevWord2 -> nextWord)
+            if (prevWord2 != null && !prevWord2.trim().isEmpty()) {
+                String bigramKey = prevWord2.trim().toLowerCase();
+                String[] nextWords = bigramContextMap.get(bigramKey);
                 if (nextWords != null) {
                     for (String nw : nextWords) {
                         if (!results.contains(nw)) {
@@ -430,5 +450,16 @@ public class Trie {
             "kamus", "prediksi", "kata", "huruf", "angka", "simbol", "cepat", "ringan"
         };
         for (String w : techAndAppTerms) insert(w, 75);
+    }
+
+    private void loadIndonesianTrigrams() {
+        trigramContextMap.put("terima kasih", new String[]{"banyak", "kembali", "bapak", "ibu"});
+        trigramContextMap.put("selamat pagi", new String[]{"semuanya", "kawan", "teman", "pak"});
+        trigramContextMap.put("apa kabar", new String[]{"kamu", "anda", "semua"});
+        trigramContextMap.put("bagaimana cara", new String[]{"membuat", "menggunakan", "kerja"});
+        trigramContextMap.put("saya mau", new String[]{"makan", "tidur", "pulang", "beli", "pesan"});
+        trigramContextMap.put("terima kasih atas", new String[]{"bantuannya", "perhatiannya", "informasinya", "dukungannya"});
+        trigramContextMap.put("mohon maaf atas", new String[]{"kesalahan", "keterlambatan", "gangguan"});
+        trigramContextMap.put("sampai jumpa", new String[]{"lagi", "besok", "nanti"});
     }
 }

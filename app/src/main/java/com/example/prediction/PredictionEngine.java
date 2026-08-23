@@ -134,6 +134,13 @@ public class PredictionEngine {
      * Executes prediction lookup in the background with contextual previous word support.
      */
     public void predictAsync(final String prefix, final String previousWord, final int maxResults, final PredictionCallback callback) {
+        predictAsync(prefix, null, previousWord, maxResults, callback);
+    }
+
+    /**
+    * Executes prediction lookup in the background with contextual N-gram (trigram & bigram) support.
+    */
+    public void predictAsync(final String prefix, final String prevWord1, final String prevWord2, final int maxResults, final PredictionCallback callback) {
         final long currentQueryId = querySequence.incrementAndGet();
         backgroundExecutor.execute(new Runnable() {
             @Override
@@ -147,7 +154,7 @@ public class PredictionEngine {
                     android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
                 } catch (Throwable ignored) {}
 
-                final List<String> results = trie.getPredictions(prefix, previousWord, maxResults);
+                final List<String> results = trie.getPredictions(prefix, prevWord1, prevWord2, maxResults);
 
                 // Check again before posting back to main thread
                 if (currentQueryId == querySequence.get() && callback != null) {

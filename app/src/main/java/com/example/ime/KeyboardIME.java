@@ -25,7 +25,27 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
     private ClipboardHistoryManager clipboardHistoryManager;
     private Vibrator vibrator;
     private StringBuilder composingWord = new StringBuilder();
+    private String secondLastWordContext = null;
     private String lastWordContext = null;
+
+    private void pushWordContext(String word) {
+        if (word != null && !word.trim().isEmpty()) {
+            String clean = word.trim().toLowerCase();
+            if (clean.contains(" ")) {
+                String[] parts = clean.split("\\s+");
+                if (parts.length >= 2) {
+                    secondLastWordContext = parts[parts.length - 2];
+                    lastWordContext = parts[parts.length - 1];
+                } else if (parts.length == 1) {
+                    secondLastWordContext = lastWordContext;
+                    lastWordContext = parts[0];
+                }
+            } else {
+                secondLastWordContext = lastWordContext;
+                lastWordContext = clean;
+            }
+        }
+    }
 
     private KeyboardTheme.ThemeStyle activeTheme = KeyboardTheme.ThemeStyle.DARK;
     private KeyboardTheme.HeightStyle heightStyle = KeyboardTheme.HeightStyle.NORMAL;
@@ -152,8 +172,9 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
             return;
         }
         final String prefix = composingWord.toString();
-        final String prevContext = lastWordContext;
-        predictionEngine.predictAsync(prefix, prevContext, 4, new PredictionEngine.PredictionCallback() {
+        final String prev1 = secondLastWordContext;
+        final String prev2 = lastWordContext;
+        predictionEngine.predictAsync(prefix, prev1, prev2, 4, new PredictionEngine.PredictionCallback() {
             @Override
             public void onPredictionsReady(String query, List<String> predictions) {
                 if (keyboardView != null && composingWord.toString().equals(query)) {
@@ -196,8 +217,9 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
             updatePredictions();
         } else {
             if (composingWord.length() > 0) {
-                lastWordContext = composingWord.toString();
-                predictionEngine.learnWordAsync(lastWordContext, false, dbHelper);
+                String word = composingWord.toString();
+                pushWordContext(word);
+                predictionEngine.learnWordAsync(word, false, dbHelper);
                 composingWord.setLength(0);
             }
             ic.commitText(String.valueOf(c), 1);
@@ -224,6 +246,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
                 composingWord.deleteCharAt(composingWord.length() - 1);
                 ic.deleteSurroundingText(1, 0);
             } else {
+                secondLastWordContext = null;
                 lastWordContext = null;
                 sendDownUpKeyEvents(android.view.KeyEvent.KEYCODE_DEL);
             }
@@ -231,6 +254,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
 
         } else if ("DELETE_ALL".equals(action)) {
             composingWord.setLength(0);
+            secondLastWordContext = null;
             lastWordContext = null;
             ic.performContextMenuAction(android.R.id.selectAll);
             ic.commitText("", 1);
@@ -245,10 +269,10 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
                     ic.deleteSurroundingText(rawWord.length(), 0);
                     ic.commitText(corrected + " ", 1);
                     predictionEngine.learnWordAsync(corrected, false, dbHelper);
-                    lastWordContext = corrected;
+                    pushWordContext(corrected);
                 } else {
-                    lastWordContext = rawWord;
-                    predictionEngine.learnWordAsync(lastWordContext, false, dbHelper);
+                    pushWordContext(rawWord);
+                    predictionEngine.learnWordAsync(rawWord, false, dbHelper);
                     ic.commitText(" ", 1);
                 }
                 composingWord.setLength(0);
@@ -259,10 +283,12 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
 
         } else if ("ENTER".equals(action)) {
             if (composingWord.length() > 0) {
-                lastWordContext = composingWord.toString();
-                predictionEngine.learnWordAsync(lastWordContext, false, dbHelper);
+                String word = composingWord.toString();
+                pushWordContext(word);
+                predictionEngine.learnWordAsync(word, false, dbHelper);
                 composingWord.setLength(0);
             }
+            secondLastWordContext = null;
             lastWordContext = null;
             ic.commitText("\n", 1);
             updatePredictions();
@@ -318,11 +344,7 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
         }
         ic.commitText(word + " ", 1);
         predictionEngine.learnWordAsync(word, false, dbHelper);
-        if (word.contains(" ")) {
-            lastWordContext = word.substring(word.lastIndexOf(' ') + 1);
-        } else {
-            lastWordContext = word;
-        }
+        pushWordContext(word);
         composingWord.setLength(0);
         updatePredictions();
     }
