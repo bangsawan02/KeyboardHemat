@@ -181,6 +181,15 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
+        CharSequence selectedText = null;
+        try {
+            selectedText = ic.getSelectedText(0);
+        } catch (Exception ignored) {}
+
+        if (!TextUtils.isEmpty(selectedText)) {
+            composingWord.setLength(0);
+        }
+
         if (Character.isLetterOrDigit(c) || c == '\'' || c == '-' || c == '_') {
             composingWord.append(c);
             ic.commitText(String.valueOf(c), 1);
@@ -203,12 +212,21 @@ public class KeyboardIME extends InputMethodService implements KeyboardViewJava.
         if (ic == null) return;
 
         if ("BACKSPACE".equals(action)) {
-            if (composingWord.length() > 0) {
+            CharSequence selectedText = null;
+            try {
+                selectedText = ic.getSelectedText(0);
+            } catch (Exception ignored) {}
+
+            if (!TextUtils.isEmpty(selectedText)) {
+                composingWord.setLength(0);
+                ic.commitText("", 1);
+            } else if (composingWord.length() > 0) {
                 composingWord.deleteCharAt(composingWord.length() - 1);
+                ic.deleteSurroundingText(1, 0);
             } else {
                 lastWordContext = null;
+                sendDownUpKeyEvents(android.view.KeyEvent.KEYCODE_DEL);
             }
-            ic.deleteSurroundingText(1, 0);
             updatePredictions();
 
         } else if ("DELETE_ALL".equals(action)) {

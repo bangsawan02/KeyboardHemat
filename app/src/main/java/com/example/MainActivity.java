@@ -126,9 +126,6 @@ public class MainActivity extends Activity {
         // 2. Live Interactive Preview Card
         rootLayout.addView(createPreviewCard());
 
-        // 3. Text Editor Card (Fitur Editor Teks)
-        rootLayout.addView(createEditorCard());
-
         // 3. Height Style Card
         rootLayout.addView(createHeightCard());
 

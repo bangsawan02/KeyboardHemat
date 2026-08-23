@@ -821,6 +821,7 @@ public class KeyboardViewJava extends LinearLayout {
                 keyPopup = new PopupWindow(popupTextView, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 keyPopup.setOutsideTouchable(true);
                 keyPopup.setFocusable(false);
+                keyPopup.setAnimationStyle(0);
             }
 
             popupTextView.setText(text);
@@ -844,7 +845,7 @@ public class KeyboardViewJava extends LinearLayout {
             }
 
             popupHandler.removeCallbacks(hidePopupRunnable);
-            popupHandler.postDelayed(hidePopupRunnable, 300);
+            popupHandler.postDelayed(hidePopupRunnable, 50);
         } catch (Exception ignored) {}
     }
 
